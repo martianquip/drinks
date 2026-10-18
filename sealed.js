@@ -9,7 +9,10 @@
   let key = fromLink;
   try { if (fromLink) localStorage.setItem('st.key', fromLink); else key = localStorage.getItem('st.key'); } catch { /* private mode: link only */ }
   if (fromLink) history.replaceState(null, '', location.pathname + location.search + '#/');  // the app routes on the hash
-  if (!key) return say('키가 들어 있는 링크로 열어 주세요.');
+  if (!key) {
+    addEventListener('hashchange', () => { if (/key=/.test(location.hash)) location.reload(); });  // key link pasted into this tab
+    return say('키가 들어 있는 링크로 열어 주세요.');
+  }
 
   const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='), c => c.charCodeAt(0));
   const aes = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
