@@ -17,7 +17,8 @@
   const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='), c => c.charCodeAt(0));
   const aes = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
   const open = async name => {
-    const res = await fetch(`data/${name}.bin`);
+    let res = await fetch(`data/${name}.bin`);
+    if (!res.ok) res = await fetch(`data/${name}.bin`);  // GitHub Pages sometimes answers a burst of requests with 503
     if (!res.ok) throw Error(`missing ${name}`);
     const box = new Uint8Array(await res.arrayBuffer());
     return crypto.subtle.decrypt({name: 'AES-GCM', iv: box.slice(0, 12), additionalData: new TextEncoder().encode(AAD + name)}, aes, box.slice(12));
