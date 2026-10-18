@@ -40,6 +40,11 @@
   say('사진 여는 중…');
   await Promise.all(items.slice(0, 40).map(reveal));
   items.slice(40).forEach(reveal);
+  for (const i of payload.drinks.items) {  // extra photos of multi-product posts; only their detail pages show them
+    const names = i.gallery || [];
+    i.gallery = names.map(() => '');
+    names.forEach((name, n) => open(name).then(b => { i.gallery[n] = URL.createObjectURL(new Blob([b], {type: 'image/jpeg'})); }, () => {}));
+  }
 
   Object.assign(window, {DRINKS: payload.drinks, BOARD_SEED: payload.seed, SEALED: true});
   for (const src of me.dataset.load.split(' ')) {

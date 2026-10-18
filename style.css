@@ -148,6 +148,9 @@ main:focus { outline: none; }
 .back { display: inline-block; color: var(--muted); text-decoration: none; padding: 4px 0 10px; }
 .d-hero { display: grid; gap: 16px; margin-bottom: 16px; }
 .d-photo { width: 100%; max-width: 360px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--r); background: #efede4; display: grid; place-items: center; }
+/* photos of the other products in a multi-product post */
+.gallery { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; background: #efede4; }
 @media (min-width: 760px) { .d-hero { grid-template-columns: 320px minmax(0, 1fr); align-items: start; } }
 .d-grid { display: grid; gap: 16px; }
 @media (min-width: 1000px) { .d-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .d-grid .wide { grid-column: 1 / -1; } }

@@ -260,7 +260,9 @@
             ${i.url ? `<a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">원글 ↗</a>` : ''}</div></div>
       </header>`;
     if (i.is_collection) {
-      main.innerHTML = hero + '<section class="panel"><h2>기타 글</h2><p>여러 제품을 함께 다루거나 결산·레시피·공지 글이라 향미 점수를 매기지 않았어요. 사진은 원글의 대표 이미지예요.</p></section>';
+      const shots = (i.gallery || []).filter(Boolean);
+      main.innerHTML = hero + `<section class="panel"><h2>여러 제품을 다룬 글</h2><p>여러 제품을 함께 다루거나 결산·레시피·공지 글이라 향미 점수를 매기지 않았어요.</p>
+        ${shots.length ? `<ul class="gallery">${shots.map((src, n) => `<li><img src="${esc(src)}" alt="${esc(i.name)} 사진 ${n + 2}" loading="lazy"></li>`).join('')}</ul>` : ''}</section>`;
       bindDetail(main); return;
     }
     const m = i.mashbill;
