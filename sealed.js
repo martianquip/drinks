@@ -25,7 +25,8 @@
   };
 
   let payload;
-  try { payload = JSON.parse(new TextDecoder().decode(await open(me.dataset.file, 'no-cache'))); } catch {
+  try { payload = JSON.parse(new TextDecoder().decode(await open(me.dataset.file, 'no-cache'))); } catch (err) {
+    if (err.name !== 'OperationError') return say('네트워크 문제로 열지 못했어요. 연결을 확인하고 새로고침해 주세요.');  // only a failed decrypt means a wrong key
     try { localStorage.removeItem('st.key'); } catch { /* nothing stored */ }
     return say('링크의 키가 맞지 않아요. 받은 링크를 다시 열어 주세요.');
   }

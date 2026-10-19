@@ -47,6 +47,12 @@
   const save = () => [store.set('st.liked', [...S.liked]), store.set('st.disliked', [...S.disliked]),
     store.set('st.compare', S.compare), store.set('st.ratings', S.ratings)].every(Boolean);
 
+  addEventListener('storage', e => {
+    if (!['st.liked', 'st.disliked', 'st.compare', 'st.ratings'].includes(e.key)) return;
+    Object.assign(S, {liked: keep('st.liked'), disliked: keep('st.disliked'), compare: [...keep('st.compare')].slice(0, 4), ratings: store.get('st.ratings', {}) || {}});
+    if (route().page !== 'ratings') render();  // redrawing the rating form would throw away an unsaved draft
+  });
+
   // ---------- visit log (this browser only) ----------
   function logView(page) {
     const v = store.get('st.visits', null) || {first: today(), days: {}};
@@ -225,7 +231,10 @@
           <ul class="cards">${shown.map(i => card(i)).join('') || '<li class="empty">조건에 맞는 리뷰가 없어요.</li>'}</ul>
           ${shown.length < list.length ? `<button type="button" class="btn more" data-more>더 보기 (${shown.length} / ${list.length})</button>` : ''}</div>
       </div>`;
-    $('[data-q]', main).oninput = e => { S.q = e.target.value; S.shown = 40; const p = e.target.selectionStart; renderLibrary(main); const n = $('[data-q]', main); n.focus(); n.setSelectionRange(p, p); };
+    const qi = $('[data-q]', main);
+    const onQuery = e => { if (e.isComposing) return; S.q = e.target.value; S.shown = 40; const p = e.target.selectionStart; renderLibrary(main); const n = $('[data-q]', main); n.focus(); n.setSelectionRange(p, p); };
+    qi.oninput = onQuery;
+    qi.addEventListener('compositionend', onQuery);  // there is no oncompositionend property; Korean input renders once the syllable is done
     $('[data-sort]', main).onchange = e => { S.sort = e.target.value; S.shown = 40; renderLibrary(main); };
     main.onchange = e => {
       const t = e.target;
@@ -383,7 +392,8 @@
   function renderRatings(main, id) {
     const target = byId.get(id);
     const r = (target && S.ratings[target.id]) || {};
-    const rated = Object.entries(S.ratings).filter(([k]) => byId.has(k)).sort((a, b) => ko(b[1].updated || '', a[1].updated || ''));
+    const ratedNow = () => Object.entries(S.ratings).filter(([k]) => byId.has(k)).sort((a, b) => ko(b[1].updated || '', a[1].updated || ''));
+    const rated = ratedNow();
     main.innerHTML = `<p class="eyebrow" lang="en">MY RATINGS</p><h1>별점 기록</h1>
       <p class="muted">리뷰와 별개로 내 평가를 남기는 기록장이에요. 이 브라우저에만 저장되니 가끔 JSON 백업을 받아 두세요.</p>
       <section class="panel">
@@ -421,7 +431,7 @@
       if (b.hasAttribute('data-export-csv')) {
         const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/^([=+\-@])/, "'$1")}"`;
         const rows = [['ID', '제품명', '분류', ...RATE_FIELDS.map(f => f[1]), '마신 날', '메모'],
-          ...rated.map(([k, v]) => [k, byId.get(k).name, byId.get(k).group, ...RATE_FIELDS.map(f => v[f[0]]), v.date, v.memo])];
+          ...ratedNow().map(([k, v]) => [k, byId.get(k).name, byId.get(k).group, ...RATE_FIELDS.map(f => v[f[0]]), v.date, v.memo])];
         download('sip-tree-ratings.csv', '﻿' + rows.map(x => x.map(q).join(',')).join('\r\n'), 'text/csv');
       }
     };
@@ -504,9 +514,15 @@
 
   // ---------- 증류소별 제품 트리 ----------
   // Whisky tree and tier maker are the atlas modules; boards-shim.js supplies their storage and records.
-  function mountBoard(main, id, module) {
-    main.innerHTML = `<div id="${id}"></div>`;
-    module.mount(main.firstChild, boardRecords());
+  function mountBoard(main, id, module, path) {
+    main.innerHTML = `<p class="board-import"><label class="btn small">JSON 백업 불러오기<input type="file" accept=".json,application/json" class="sr" data-import></label></p><div id="${id}"></div>`;
+    $('[data-import]', main).onchange = async e => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !confirm('이 브라우저에 저장된 보드를 백업 파일 내용으로 바꿀까요?')) return;
+      try { await importBoards(path, await file.text()); location.reload(); } catch (err) { toast(err.message); }
+    };
+    module.mount($(`#${id}`, main), boardRecords());
   }
 
   // ---------- routing (hash: works from file://) ----------
@@ -521,7 +537,7 @@
     renderShell(key === 'tree' ? 'rec' : key === 'item' ? '' : key);
     document.title = '마시는 큅 · MARTIANQUIP';
     ({item: () => renderDetail(main, id), rec: () => renderRec(main), tree: () => renderTree(main, id), ratings: () => renderRatings(main, id),
-      compare: () => renderCompare(main), stats: () => renderStats(main), distill: () => mountBoard(main, 'whisky-tree-editor', WhiskyTree), tier: () => mountBoard(main, 'tier-maker-editor', TierMaker)}[key] || (() => renderLibrary(main)))();
+      compare: () => renderCompare(main), stats: () => renderStats(main), distill: () => mountBoard(main, 'whisky-tree-editor', WhiskyTree, '/api/whisky-tree'), tier: () => mountBoard(main, 'tier-maker-editor', TierMaker, '/api/tier-maker')}[key] || (() => renderLibrary(main)))();
     return key;
   }
   // Card/detail buttons and sidebar category links work on every page.

@@ -29,6 +29,30 @@ async function api(path, opts = {}) {
   return {revision: next.revision};
 }
 
+// Restores a file saved with the board's own "JSON" export button (the modules only export).
+async function importBoards(path, text) {
+  let doc;
+  try { const parsed = JSON.parse(text); doc = parsed.document || parsed; } catch { throw Error('JSON 파일을 읽지 못했어요.'); }
+  const version = {'/api/whisky-tree': 3, '/api/tier-maker': 1}[path];
+  if (doc?.version !== version || !Array.isArray(doc.boards) || !doc.boards.length) throw Error('이 화면의 백업 파일이 아니에요. 위스키 트리와 티어 메이커 백업은 서로 바꿔 쓸 수 없어요.');
+  // the shape the modules read (same rules as the atlas server's validators), so a bad file never replaces good boards
+  const text1 = v => typeof v === 'string' && v.trim() !== '';
+  const board = path === '/api/tier-maker'
+    ? b => text1(b?.id) && text1(b.name) && ['S', 'A', 'B', 'C', 'D'].every(r => Array.isArray(b.tiers?.[r]) && b.tiers[r].every(text1))
+    : b => text1(b?.id) && text1(b.name) && Array.isArray(b.columns) && b.columns.every(c => text1(c?.id) && text1(c.name))
+      && Array.isArray(b.levels) && b.levels.length === 6 && b.levels.every(l => typeof l?.name === 'string')
+      && Array.isArray(b.nodes) && b.nodes.every(n => text1(n?.review_id) && b.columns.some(c => c.id === n.column_id)
+        && Number.isInteger(n.level) && n.level >= 0 && n.level < 6 && Number.isInteger(n.slot) && n.slot >= 0 && n.slot < 10
+        && (n.lineup == null || typeof n.lineup === 'string'));
+  if (typeof doc.labels !== 'object' || doc.labels === null || !Object.values(doc.labels).every(text1)
+    || !Array.isArray(doc.recommended ?? []) || !(doc.recommended ?? []).every(text1) || !doc.boards.every(board)) {
+    throw Error('백업 파일 내용이 손상됐어요. 지금 보드는 그대로 두었어요.');
+  }
+  doc.recommended ??= [];
+  const {revision} = await api(path);
+  await api(path, {method: 'POST', body: JSON.stringify({revision, document: doc})});
+}
+
 // drink-tree items in the atlas record shape the two modules read.
 function boardRecords() {
   let ratings = {};
@@ -40,8 +64,8 @@ function boardRecords() {
     catalog: {
       photo_url: i.photo, country: i.country, origin: i.country === '스코틀랜드' ? '스카치' : '', distillery: i.producer.name, sample_type: i.sample_type,
       primary_type: /에너지드링크/.test(i.style) ? '에너지드링크' : i.style,
-      // shortcut: "peated" = smoke·peat score of 2+ in the hand-scored profile; switch to a real peat field if one is added.
-      subtypes: (window.Engine.vector(i)[smoke] ?? 0) >= 2 ? ['피티드'] : [],
+      // shortcut: "peated" = non-US whisky with a smoke·peat score of 2+; switch to a real peat field if one is added.
+      subtypes: i.group === '위스키' && i.country !== '미국' && (window.Engine.vector(i)[smoke] ?? 0) >= 2 ? ['피티드'] : [],  // bourbon char reads smoky but is not peat
     },
   }));
 }
